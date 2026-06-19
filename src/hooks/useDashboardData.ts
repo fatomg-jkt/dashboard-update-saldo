@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BalanceEntry, DashboardData, DashboardSettings, DeviceStatus } from '../types';
 
-export const queryKeys = { dashboardData: ['dashboard-data'] as const };
+export const queryKeys = { dashboardData: ['dashboard-data'] as const, storageStatus: ['storage-status'] as const };
+export interface StorageStatus { configured: boolean; message?: string; }
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null);
@@ -11,6 +12,11 @@ async function parseResponse<T>(response: Response): Promise<T> {
     throw error;
   }
   return payload as T;
+}
+
+async function fetchStorageStatus(): Promise<StorageStatus> {
+  const response = await fetch('/api/storage-status', { cache: 'no-store' });
+  return parseResponse<StorageStatus>(response);
 }
 
 async function fetchDashboardData(): Promise<DashboardData> {
@@ -24,7 +30,8 @@ async function saveDashboardData(data: DashboardData): Promise<DashboardData> {
   return data;
 }
 
-export function useDashboardData() { return useQuery({ queryKey: queryKeys.dashboardData, queryFn: fetchDashboardData }); }
+export function useStorageStatus() { return useQuery({ queryKey: queryKeys.storageStatus, queryFn: fetchStorageStatus }); }
+export function useDashboardData(enabled = true) { return useQuery({ queryKey: queryKeys.dashboardData, queryFn: fetchDashboardData, enabled }); }
 function useSaveDashboardData() { const qc = useQueryClient(); return useMutation({ mutationFn: saveDashboardData, onSuccess: (data) => qc.setQueryData(queryKeys.dashboardData, data) }); }
 function withTimestamp<T extends { updated_at?: string }>(value: T): T { return { ...value, updated_at: new Date().toISOString() }; }
 

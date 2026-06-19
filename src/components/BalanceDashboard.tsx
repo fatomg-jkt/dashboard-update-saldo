@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { formatRupiah, formatTanggalIndonesia } from '../lib/format';
 import type { BalanceEntry, Category, DeviceStatus, FiltersState } from '../types';
 import { categories } from '../types';
-import { useCreateBalanceEntry, useCreateDeviceStatus, useDashboardData, useDeleteBalanceEntry, useDeleteDeviceStatus, useUpdateBalanceEntry, useUpdateDashboardSettings, useUpdateDeviceStatus, verifyAdminPassword } from '../hooks/useDashboardData';
+import { useCreateBalanceEntry, useCreateDeviceStatus, useDashboardData, useDeleteBalanceEntry, useDeleteDeviceStatus, useStorageStatus, useUpdateBalanceEntry, useUpdateDashboardSettings, useUpdateDeviceStatus, verifyAdminPassword } from '../hooks/useDashboardData';
 
 type Tab = 'Overview' | 'Brand Details' | 'Device Status';
 const editKey = 'dashboard-edit-mode';
@@ -17,7 +17,8 @@ export function BalanceDashboard() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [quickOpen, setQuickOpen] = useState(false);
-  const dataQ = useDashboardData();
+  const storageQ = useStorageStatus();
+  const dataQ = useDashboardData(storageQ.data?.configured === true);
   const createEntry = useCreateBalanceEntry(); const updateEntry = useUpdateBalanceEntry(); const deleteEntry = useDeleteBalanceEntry();
   const createDevice = useCreateDeviceStatus(); const updateDevice = useUpdateDeviceStatus(); const deleteDevice = useDeleteDeviceStatus(); const updateSettings = useUpdateDashboardSettings();
   const entries = dataQ.data?.balanceEntries ?? []; const devices = dataQ.data?.deviceStatuses ?? []; const settings = dataQ.data?.dashboardSettings;
@@ -26,8 +27,10 @@ export function BalanceDashboard() {
   const total = entries.reduce((sum, entry) => sum + Number(entry.balance), 0);
   const groups = useMemo(() => Object.values(entries.reduce<Record<string, { name: string; entityName: string; entries: BalanceEntry[]; subtotal: number }>>((acc, entry) => { const key = `${entry.brand_name}__${entry.entity_name ?? ''}`; acc[key] ??= { name: entry.brand_name, entityName: entry.entity_name ?? '', entries: [], subtotal: 0 }; acc[key].entries.push(entry); acc[key].subtotal += Number(entry.balance); return acc; }, {})).sort((a,b)=>b.subtotal-a.subtotal), [entries]);
   const localDetected = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem(localStorageKey));
+  if (storageQ.isLoading) return <Shell><p className="rounded-3xl bg-white p-8 shadow-sm">Checking storage status...</p></Shell>;
+  if (storageQ.error) return <Shell><p className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-700">Gagal mengecek status Vercel Blob. {storageQ.error.message}</p></Shell>;
+  if (storageQ.data?.configured === false) return <BlobSetupScreen />;
   if (dataQ.isLoading) return <Shell><p className="rounded-3xl bg-white p-8 shadow-sm">Loading dashboard data...</p></Shell>;
-  if ((dataQ.error as Error & { code?: string } | null)?.code === 'BLOB_NOT_CONFIGURED') return <BlobSetupScreen />;
   if (dataQ.error) return <Shell><p className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-700">Gagal mengambil data dashboard. {dataQ.error.message}</p></Shell>;
   const unlock = async () => { try { await verifyAdminPassword(password); sessionStorage.setItem(editKey, 'true'); setEditMode(true); setPasswordOpen(false); setPassword(''); setMessage('Edit Mode Active.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Password belum sesuai. Silakan coba lagi.'); } };
   const save = async (promise: Promise<unknown>, ok: string) => { try { await promise; setMessage(ok); } catch (error) { setMessage(error instanceof Error ? error.message : 'Terjadi kesalahan.'); } };

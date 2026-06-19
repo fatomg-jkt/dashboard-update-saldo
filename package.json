@@ -15,7 +15,8 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "@vercel/blob": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",

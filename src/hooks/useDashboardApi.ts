@@ -12,7 +12,14 @@ export function useStorageStatus() {
 }
 
 export function useDashboardData(enabled: boolean) {
-  return useQuery({ queryKey: ['dashboard-data'], queryFn: () => fetchJson<DashboardData>('/api/dashboard-data'), enabled });
+  return useQuery({
+    queryKey: ['dashboard-data'],
+    queryFn: async () => {
+      const response = await fetchJson<{ success: true; data: DashboardData }>('/api/dashboard-data');
+      return response.data;
+    },
+    enabled,
+  });
 }
 
 export function useUpdateDashboardData() {

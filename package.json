@@ -15,7 +15,8 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "latest",
+    "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",

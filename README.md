@@ -1,76 +1,74 @@
 # Dashboard Update Saldo All Brand
 
-Dashboard finance internal berbasis Vite + React + TypeScript + TanStack Router + TanStack Query + Tailwind. Data utama sekarang disimpan di Supabase, bukan lagi `localStorage` browser.
+Dashboard finance internal berbasis Vite + React + TypeScript + TanStack Router + TanStack Query + Tailwind. Data utama disimpan online sebagai satu file JSON di **Vercel Blob** melalui API route serverless, bukan `localStorage` browser.
 
-## Setup Supabase
+## Setup Vercel Blob
 
-1. Buat project Supabase baru.
-2. Buka SQL Editor di Supabase.
-3. Jalankan isi file `docs/supabase-schema.sql` untuk membuat tabel:
-   - `balance_entries`
-   - `device_statuses`
-   - `dashboard_settings`
-4. Opsional untuk demo/prototype: jalankan `docs/seed-sample-data.sql`.
-
-Schema sudah menyertakan trigger `updated_at`, seed setting awal untuk `update_date` dan `dashboard_title`, serta RLS policy prototype: public read dan public write. Write tetap hanya ditampilkan di app setelah Edit Mode di-unlock, namun ini bukan security production.
-
-## Environment variables lokal
-
-Buat file `.env`:
+1. Buka project di Vercel.
+2. Masuk ke menu **Storage**.
+3. Klik **Create Database / Create Blob** dan pilih **Blob**.
+4. Hubungkan Blob store ke project dashboard ini.
+5. Pastikan Environment Variable `BLOB_READ_WRITE_TOKEN` otomatis tersedia di project.
+6. Tambahkan Environment Variable admin:
 
 ```bash
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+ADMIN_PASSWORD=fatmanage
 ```
 
-Ambil nilainya dari Supabase Project Settings > API.
+7. Redeploy project setelah Blob dan env dibuat.
 
-## Environment variables di Vercel
+Jika dashboard menampilkan **“Vercel Blob belum dikonfigurasi”**, artinya serverless API belum menerima `BLOB_READ_WRITE_TOKEN`. Periksa kembali Storage/Environment Variables di Vercel lalu redeploy.
 
-Di Vercel Project Settings > Environment Variables, tambahkan:
+## Cara kerja storage
 
-```bash
-VITE_SUPABASE_URL=<supabase-project-url>
-VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
-```
+- Frontend tidak akses Blob langsung.
+- Frontend call API route `/api/dashboard-data`.
+- API route membaca/menulis file Blob: `dashboard-saldo-data.json`.
+- Struktur file JSON:
+  - `balanceEntries`
+  - `deviceStatuses`
+  - `dashboardSettings`
+- Jika file belum ada, API mengembalikan sample data awal.
+- Saat ada perubahan saldo/device/settings, API overwrite file Blob dengan `allowOverwrite: true`.
 
-Redeploy setelah variable disimpan.
+## Edit Mode
 
-### Troubleshooting: muncul “Supabase belum dikonfigurasi” di Vercel
+- Default dashboard adalah View Mode/read-only untuk management.
+- Klik **Unlock Edit Mode** untuk membuka fitur finance admin.
+- Password dicek lewat `/api/auth` memakai `ADMIN_PASSWORD`.
+- Untuk development, default password adalah `fatmanage` jika `ADMIN_PASSWORD` belum diset.
+- Status Edit Mode disimpan di `sessionStorage` saja.
 
-Jika halaman deploy menampilkan pesan tersebut, artinya build Vite belum menerima environment variables. Perbaiki dengan langkah berikut:
-
-1. Buka Supabase → Project Settings → API.
-2. Copy `Project URL` ke `VITE_SUPABASE_URL`.
-3. Copy `anon public` key ke `VITE_SUPABASE_ANON_KEY`.
-4. Buka Vercel → Project Settings → Environment Variables.
-5. Tambahkan kedua variable untuk environment Production.
-6. Klik Redeploy pada deployment terbaru.
-
-Nama variable harus persis memakai prefix `VITE_`; tanpa prefix ini Vite tidak akan mengekspos variable ke aplikasi frontend.
-
-## Install dan run
+## Run local
 
 ```bash
 npm install
 npm run dev
+```
+
+Untuk local yang benar-benar memakai Blob, jalankan lewat Vercel CLI atau set `BLOB_READ_WRITE_TOKEN` di environment lokal.
+
+## Build
+
+```bash
 npm run build
 ```
 
+## Deploy ke Vercel
+
+- Framework Preset: **Vite**
+- Install Command: `npm install`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Required env:
+  - `BLOB_READ_WRITE_TOKEN`
+  - `ADMIN_PASSWORD=fatmanage`
+
 ## Fitur utama
 
-- Executive Overview dengan hero metric Total All Rekening.
+- Overview executive dengan hero metric Total All Rekening.
 - Tab `Overview`, `Brand Details`, dan `Device Status`.
-- Read-only View Mode default untuk management.
-- Edit Mode untuk finance admin dengan tombol `Unlock Edit Mode`.
-- Password Edit Mode: `fatmanage`.
-- Status Edit Mode disimpan di `sessionStorage`, sehingga tidak permanen lintas sesi browser.
-- Inline update saldo dan notes di Brand Details.
-- Modal `Update Saldo Hari Ini` untuk update cepat seluruh rekening.
-- CRUD rekening dan device status hanya muncul saat Edit Mode aktif.
-- Banner migrasi `localStorage` lama ke Supabase hanya muncul saat Edit Mode aktif.
-- Import JSON, Export JSON, dan tombol reset sample data dihapus dari UI utama.
-
-## Catatan keamanan
-
-Password frontend `fatmanage` hanya proteksi ringan untuk prototype internal. Karena anon key dan policy prototype masih mengizinkan write, gunakan Supabase Auth, server-side API, atau policy berbasis role sebelum dipakai sebagai sistem production.
+- Inline update saldo dan notes di Brand Details saat Edit Mode aktif.
+- Quick Update Saldo Hari Ini untuk update banyak rekening sekaligus.
+- Tambah/hapus rekening dan edit device status hanya saat Edit Mode aktif.
+- Tidak ada Import JSON, Export JSON, atau halaman Data Management terpisah.

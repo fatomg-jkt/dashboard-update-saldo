@@ -16,13 +16,14 @@
     "react-dom": "latest",
     "typescript": "latest",
     "vite": "latest",
-    "@supabase/supabase-js": "latest"
+    "@vercel/blob": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "@vercel/node": "latest"
   }
 }

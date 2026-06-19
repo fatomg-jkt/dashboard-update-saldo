@@ -1,3 +1,1 @@
-import type { Brand } from '../types';
-import { formatRupiah } from '../lib/format';
-export function BalanceEntryTable({ brands }: { brands: Brand[] }) { const entries=brands.flatMap(b=>b.entries.map(e=>({brand:b.name,...e}))); return <div className="rounded-xl border bg-white p-3 shadow-sm"><h2 className="mb-2 font-black">Indeks Rekening Terfilter</h2><div className="max-h-72 overflow-auto"><table className="w-full border-collapse text-xs"><tbody>{entries.map(e=><tr key={e.id}><td className="sheet-cell font-bold">{e.brand}</td><td className="sheet-cell">{e.name}</td><td className="sheet-cell">{e.provider}</td><td className="sheet-cell">{e.accountNumber}</td><td className="sheet-cell text-right font-bold">{formatRupiah(e.balance)}</td></tr>)}</tbody></table></div></div> }
+export {};

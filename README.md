@@ -36,6 +36,19 @@ VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
 
 Redeploy setelah variable disimpan.
 
+### Troubleshooting: muncul “Supabase belum dikonfigurasi” di Vercel
+
+Jika halaman deploy menampilkan pesan tersebut, artinya build Vite belum menerima environment variables. Perbaiki dengan langkah berikut:
+
+1. Buka Supabase → Project Settings → API.
+2. Copy `Project URL` ke `VITE_SUPABASE_URL`.
+3. Copy `anon public` key ke `VITE_SUPABASE_ANON_KEY`.
+4. Buka Vercel → Project Settings → Environment Variables.
+5. Tambahkan kedua variable untuk environment Production.
+6. Klik Redeploy pada deployment terbaru.
+
+Nama variable harus persis memakai prefix `VITE_`; tanpa prefix ini Vite tidak akan mengekspos variable ke aplikasi frontend.
+
 ## Install dan run
 
 ```bash

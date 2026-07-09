@@ -3,6 +3,8 @@ export type Category = 'Bank' | 'Payment Gateway' | 'EDC' | 'Cash' | 'Petty Cash
 export interface BalanceEntry {
   id: string;
   brandName: string;
+  brandColor?: string;
+  groupName?: string;
   entityName?: string;
   accountName: string;
   provider: string;
@@ -39,5 +41,5 @@ export interface DashboardData {
 }
 
 export interface StorageStatus { configured: boolean; message?: string }
-export interface BrandGroup { brandName: string; entityName?: string; entries: BalanceEntry[]; subtotal: number }
+export interface BrandGroup { brandName: string; brandColor?: string; entries: BalanceEntry[]; subtotal: number }
 export const categories: Category[] = ['Bank', 'Payment Gateway', 'EDC', 'Cash', 'Petty Cash', 'Setoran Tunai', 'Lainnya'];

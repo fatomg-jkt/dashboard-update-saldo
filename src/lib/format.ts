@@ -9,9 +9,10 @@ export const byCategory = (entries: BalanceEntry[]) => entries.reduce<Record<Cat
 export function groupBrands(entries: BalanceEntry[]): BrandGroup[] {
   const groups = new Map<string, BrandGroup>();
   entries.filter((entry) => entry.isActive).sort((a, b) => a.displayOrder - b.displayOrder).forEach((entry) => {
-    const key = `${entry.brandName}__${entry.entityName || ''}`;
-    const group = groups.get(key) || { brandName: entry.brandName, entityName: entry.entityName, entries: [], subtotal: 0 };
-    group.entries.push(entry); group.subtotal += entry.balance; groups.set(key, group);
+    const group = groups.get(entry.brandName) || { brandName: entry.brandName, brandColor: entry.brandColor, entries: [], subtotal: 0 };
+    group.entries.push(entry);
+    group.subtotal += entry.balance;
+    groups.set(entry.brandName, group);
   });
   return [...groups.values()];
 }

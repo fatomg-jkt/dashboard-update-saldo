@@ -44,7 +44,7 @@ export function BalanceDashboard() {
 
   if (dashboard.isLoading) return <State title="Mengambil data saldo" message="Jika file Blob belum ada, sample data akan otomatis digunakan. Maksimal tunggu 10 detik." />;
   if (dashboard.isError) return <State title="Dashboard gagal dimuat" message={dashboard.error instanceof Error ? dashboard.error.message : 'API dashboard-data belum merespons normal.'} retry={() => dashboard.refetch()} />;
-  if (dashboardResponse && !dashboardResponse.success) return <State title="Dashboard gagal dimuat" message={dashboardResponse.message ?? 'API mengembalikan status gagal.'} retry={() => dashboard.refetch()} />;
+  if (dashboardResponse && !dashboardResponse.success) return <State title="Dashboard gagal dimuat" message={dashboardResponse.error ?? 'API mengembalikan status gagal.'} retry={() => dashboard.refetch()} />;
   if (!data) return <State title="Dashboard gagal dimuat" message="API dashboard-data tidak mengirim data dashboard." retry={() => dashboard.refetch()} />;
 
   return <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 lg:px-8"><div className="mx-auto max-w-7xl space-y-8">

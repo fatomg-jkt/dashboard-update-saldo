@@ -40,6 +40,6 @@ export interface DashboardData {
   dashboardSettings: DashboardSettings;
 }
 
-export interface StorageStatus { configured: boolean; message?: string }
+export interface StorageStatus { configured: boolean; error?: string }
 export interface BrandGroup { brandName: string; brandColor?: string; entries: BalanceEntry[]; subtotal: number }
 export const categories: Category[] = ['Bank', 'Payment Gateway', 'EDC', 'Cash', 'Petty Cash', 'Setoran Tunai', 'Lainnya'];

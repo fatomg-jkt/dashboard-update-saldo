@@ -2,8 +2,34 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DashboardData, StorageStatus } from '../types';
 
 const REQUEST_TIMEOUT_MS = 10000;
+const RESPONSE_PREVIEW_LENGTH = 200;
 
-export type DashboardApiResponse = { success: boolean; data: DashboardData; message?: string };
+export type DashboardApiResponse = { success: true; data: DashboardData } | { success: false; error: string; data?: DashboardData };
+
+type ErrorPayload = { message?: unknown; error?: unknown };
+
+function getResponseError(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === 'object') {
+    const errorPayload = payload as ErrorPayload;
+    if (typeof errorPayload.error === 'string') return errorPayload.error;
+    if (typeof errorPayload.message === 'string') return errorPayload.message;
+  }
+  return fallback;
+}
+
+function parseJson<T>(text: string, contentType: string | null): T {
+  const looksJson = contentType?.toLowerCase().includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[');
+  if (!looksJson) {
+    throw new Error(`API returned non-JSON response: ${text.slice(0, RESPONSE_PREVIEW_LENGTH)}`);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid JSON';
+    throw new Error(`API returned invalid JSON: ${message}. Response preview: ${text.slice(0, RESPONSE_PREVIEW_LENGTH)}`);
+  }
+}
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
@@ -12,11 +38,10 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     const response = await fetch(url, { ...init, signal: init?.signal ?? controller.signal });
     const text = await response.text();
-    const payload = text ? JSON.parse(text) as T : ({} as T);
+    const payload = text ? parseJson<T>(text, response.headers.get('content-type')) : ({} as T);
 
     if (!response.ok) {
-      const message = typeof payload === 'object' && payload && 'message' in payload ? String(payload.message) : text;
-      throw new Error(message || `Request failed with status ${response.status}`);
+      throw new Error(getResponseError(payload, `Request failed with status ${response.status}`));
     }
 
     return payload;

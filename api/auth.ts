@@ -3,9 +3,9 @@ type VercelResponse = { status: (code: number) => { setHeader: (name: string, va
 
 type AuthBody = { password?: string };
 
-function sendJson(res: VercelResponse, status: number, body: { ok: boolean; message?: string }) {
+function sendJson(res: VercelResponse, status: number, body: { ok: boolean; error?: string }) {
   const response = res.status(status);
-  response.setHeader('content-type', 'application/json');
+  response.setHeader('content-type', 'application/json; charset=utf-8');
   response.end(JSON.stringify(body));
 }
 
@@ -17,11 +17,11 @@ function parseBody(body: unknown): AuthBody {
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    if (req.method !== 'POST') return sendJson(res, 405, { ok: false, message: 'Method not allowed' });
+    if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'Method not allowed' });
     const body = parseBody(req.body);
     const expectedPassword = process.env.ADMIN_PASSWORD || 'fatmanage';
     return sendJson(res, 200, { ok: body.password === expectedPassword });
   } catch (error) {
-    return sendJson(res, 500, { ok: false, message: error instanceof Error ? error.message : 'Authentication API failed' });
+    return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : 'Authentication API failed' });
   }
 }

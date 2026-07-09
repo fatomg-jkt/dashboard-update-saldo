@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useAuthUnlock, useDashboardData, useStorageStatus, useUpdateDashboardData } from '../hooks/useDashboardApi';
+import { useAuthUnlock, useDashboardData, useUpdateDashboardData } from '../hooks/useDashboardApi';
 import { byCategory, createId, formatCurrency, groupBrands, stamp, today, totalBalance, withSettings } from '../lib/format';
 import type { BalanceEntry, Category, DashboardData, DeviceStatus } from '../types';
 import { categories } from '../types';
@@ -10,8 +10,7 @@ const setEntries = (data: DashboardData, entries: BalanceEntry[]): DashboardData
 const setDevices = (data: DashboardData, rows: DeviceStatus[]): DashboardData => withSettings({ ...data, deviceStatuses: rows });
 
 export function BalanceDashboard() {
-  const storage = useStorageStatus();
-  const dashboard = useDashboardData(storage.data?.configured === true);
+  const dashboard = useDashboardData();
   const updateData = useUpdateDashboardData();
   const auth = useAuthUnlock();
   const [tab, setTab] = useState<'overview' | 'brands' | 'devices'>('overview');
@@ -25,7 +24,8 @@ export function BalanceDashboard() {
   const [sort, setSort] = useState<'desc' | 'asc'>('desc');
   const [quickOpen, setQuickOpen] = useState(false);
 
-  const data = dashboard.data;
+  const dashboardResponse = dashboard.data;
+  const data = dashboardResponse?.success ? dashboardResponse.data : undefined;
   const metrics = useMemo(() => {
     const entries = data?.balanceEntries ?? [];
     const groups = groupBrands(entries);
@@ -42,10 +42,10 @@ export function BalanceDashboard() {
   const deleteDevice = (id: string) => data && confirm('Hapus device ini?') && save(setDevices(data, data.deviceStatuses.filter((row) => row.id !== id)), 'Device dihapus.');
   const unlock = async () => { const result = await auth.mutateAsync(password); if (result.ok) { sessionStorage.setItem('finance-edit-mode', 'true'); setEditMode(true); setPasswordOpen(false); setAuthError(''); } else setAuthError('Password belum sesuai. Silakan cek kembali.'); };
 
-  if (storage.isLoading) return <State title="Menyiapkan dashboard" message="Mengecek status Vercel Blob dari server..." />;
-  if (storage.data?.configured === false) return <State title="Vercel Blob belum dikonfigurasi" message={storage.data.message ?? 'BLOB_READ_WRITE_TOKEN missing'} />;
-  if (dashboard.isLoading) return <State title="Mengambil data saldo" message="Jika file Blob belum ada, sample data akan otomatis digunakan." />;
-  if (dashboard.isError || !data) return <State title="Dashboard gagal dimuat" message="API dashboard-data belum merespons normal. Cek Vercel Function logs." />;
+  if (dashboard.isLoading) return <State title="Mengambil data saldo" message="Jika file Blob belum ada, sample data akan otomatis digunakan. Maksimal tunggu 10 detik." />;
+  if (dashboard.isError) return <State title="Dashboard gagal dimuat" message={dashboard.error instanceof Error ? dashboard.error.message : 'API dashboard-data belum merespons normal.'} retry={() => dashboard.refetch()} />;
+  if (dashboardResponse && !dashboardResponse.success) return <State title="Dashboard gagal dimuat" message={dashboardResponse.message ?? 'API mengembalikan status gagal.'} retry={() => dashboard.refetch()} />;
+  if (!data) return <State title="Dashboard gagal dimuat" message="API dashboard-data tidak mengirim data dashboard." retry={() => dashboard.refetch()} />;
 
   return <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 lg:px-8"><div className="mx-auto max-w-7xl space-y-8">
     {toast && <div className="fixed right-5 top-5 z-50 rounded-2xl bg-emerald-600 px-5 py-3 text-white shadow-xl">{toast}</div>}
@@ -59,7 +59,7 @@ export function BalanceDashboard() {
     {quickOpen && <Modal title="Quick Update Saldo Hari Ini" onClose={() => setQuickOpen(false)}><div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[900px] text-sm"><thead><tr className="text-left"><th>Brand</th><th>Account</th><th>Provider</th><th>Code</th><th>Current Balance</th><th>New Balance</th><th>Notes</th></tr></thead><tbody>{data.balanceEntries.map((entry) => <tr className="border-t" key={entry.id}><td>{entry.brandName}</td><td>{entry.accountName}</td><td>{entry.provider}</td><td>{entry.accountCode}</td><td>{formatCurrency(entry.balance)}</td><td><input className="input" type="number" defaultValue={entry.balance} onBlur={(e) => updateEntry(entry.id, { balance: Number(e.target.value) })} /></td><td><input className="input" defaultValue={entry.notes} onBlur={(e) => updateEntry(entry.id, { notes: e.target.value })} /></td></tr>)}</tbody></table></div><button className="mt-4 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white" onClick={() => { data && save(withSettings({ ...data, dashboardSettings: { ...data.dashboardSettings, updateDate: today(), lastUpdatedAt: stamp() } }), 'Quick update selesai.'); setQuickOpen(false); }}>Save</button></Modal>}
   </div></main>;
 }
-function State({ title, message }: { title: string; message: string }) { return <main className="grid min-h-screen place-items-center bg-slate-100 p-6"><div className="max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm"><h1 className="text-2xl font-bold">{title}</h1><p className="mt-3 text-slate-600">{message}</p></div></main>; }
+function State({ title, message, retry }: { title: string; message: string; retry?: () => void }) { return <main className="grid min-h-screen place-items-center bg-slate-100 p-6"><div className="max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm"><h1 className="text-2xl font-bold">{title}</h1><p className="mt-3 text-slate-600">{message}</p>{retry && <button onClick={retry} className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-700">Retry</button>}</div></main>; }
 function Panel({ title, children }: { title: string; children: ReactNode }) { return <div className="rounded-3xl bg-white p-6 shadow-sm"><h2 className="mb-4 text-xl font-bold">{title}</h2><div className="space-y-3">{children}</div></div>; }
 function Line({ left, right }: { left: string; right: string }) { return <div className="flex justify-between gap-4 border-b border-slate-100 pb-3"><span className="text-slate-600">{left}</span><strong>{right}</strong></div>; }
 function Cell({ edit, value, onChange }: { edit: boolean; value: string; onChange: (value: string) => void }) { return <td className="py-3 pr-3">{edit ? <input className="input" value={value} onChange={(e) => onChange(e.target.value)} /> : value}</td>; }

@@ -72,7 +72,10 @@ export function useUpdateDashboardData() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: DashboardData) => fetchJson<DashboardApiResponse>('/api/dashboard-data', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['dashboard-data'] }),
+    onSuccess: (response) => {
+      if (response.success) queryClient.setQueryData<DashboardApiResponse>(['dashboard-data'], response);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+    },
   });
 }
 

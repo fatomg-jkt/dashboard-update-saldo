@@ -1,3 +1,5 @@
+import { get, put } from '@vercel/blob';
+
 type Category = 'Bank' | 'Payment Gateway' | 'EDC' | 'Cash' | 'Petty Cash' | 'Setoran Tunai' | 'Lainnya';
 
 type BalanceEntry = {
@@ -190,17 +192,17 @@ async function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> 
   }
 }
 
+async function streamToText(stream: ReadableStream<Uint8Array>): Promise<string> {
+  return await new Response(stream).text();
+}
+
 async function readDashboardData(): Promise<{ data: DashboardData; error?: string }> {
   try {
-    const { list } = await import('@vercel/blob');
-    const blobs = await withTimeout(list({ prefix: BLOB_FILE, limit: 10 }), 'Vercel Blob list timed out');
-    const match = blobs.blobs.find((blob) => blob.pathname === BLOB_FILE);
-    if (!match) return { data: sampleDashboardData };
+    const result = await withTimeout(get(BLOB_FILE, { access: 'private', useCache: false }), 'Vercel Blob get timed out');
+    if (!result) return { data: sampleDashboardData };
+    if (result.statusCode !== 200 || !result.stream) return { data: sampleDashboardData, error: `Dashboard Blob get returned status ${result.statusCode}` };
 
-    const response = await withTimeout(fetch(`${match.url}?t=${Date.now()}`), 'Dashboard Blob fetch timed out');
-    if (!response.ok) return { data: sampleDashboardData, error: `Dashboard Blob fetch failed with status ${response.status}` };
-
-    const text = await withTimeout(response.text(), 'Dashboard Blob response read timed out');
+    const text = await withTimeout(streamToText(result.stream), 'Dashboard Blob response read timed out');
     let payload: unknown;
     try {
       payload = JSON.parse(text);
@@ -228,19 +230,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'PUT') {
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        return sendJson(res, 200, { success: false, error: 'BLOB_READ_WRITE_TOKEN missing. Data was not saved.', data: sampleDashboardData });
+        return sendJson(res, 503, { success: false, error: 'BLOB_READ_WRITE_TOKEN missing. Data was not saved.' });
       }
 
       const payload = parseBody(req.body);
-      if (!isDashboardData(payload)) return sendJson(res, 400, { success: false, error: 'Invalid dashboard data payload', data: sampleDashboardData });
+      if (!isDashboardData(payload)) return sendJson(res, 400, { success: false, error: 'Invalid dashboard data payload' });
 
-      const { put } = await import('@vercel/blob');
-      await withTimeout(put(BLOB_FILE, JSON.stringify(payload, null, 2), { access: 'public', allowOverwrite: true, contentType: 'application/json' }), 'Vercel Blob save timed out');
+      const access = 'private';
+      await withTimeout(put(BLOB_FILE, JSON.stringify(payload, null, 2), { access, allowOverwrite: true, contentType: 'application/json' }), 'Vercel Blob save timed out');
       return sendJson(res, 200, { success: true, data: payload });
     }
 
     return sendJson(res, 405, { success: false, error: 'Method not allowed', data: sampleDashboardData });
   } catch (error) {
-    return sendJson(res, 200, { success: false, error: error instanceof Error ? error.message : 'Dashboard data API failed', data: sampleDashboardData });
+    return sendJson(res, req.method === 'PUT' ? 500 : 200, { success: false, error: error instanceof Error ? error.message : 'Dashboard data API failed', data: req.method === 'GET' ? sampleDashboardData : undefined });
   }
 }

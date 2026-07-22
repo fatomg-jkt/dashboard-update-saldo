@@ -1,18 +1,18 @@
 export type StatusBudget = 'AMAN' | 'PERLU PERHATIAN' | 'OVER BUDGET' | 'TIDAK DIPROYEKSIKAN';
-export type ProyeksiAktual = { departemen: string; jenisBiaya: string; kategori: string; proyeksi: number; aktual: number; catatan: string; minggu: string };
+export type ProyeksiAktual = { departemen: string; jenisBiaya: string; kategori: string; proyeksi: number; aktual: number; catatan: string; minggu: string; tahun: number; bulan: number };
 export type RekeningBank = { brand: string; perusahaan: string; bank: string; nomor: string; saldoAwal: number; masuk: number; keluar: number; saldoMinimum: number; updatedAt: string };
 export type MutasiBank = { tanggal: string; bank: string; nomorRekening: string; deskripsi: string; referensi: string; debit: number; kredit: number; saldo: number; departemen: string; kategori: string; masukProyeksi: boolean; catatan: string };
 
 export const proyeksiAktual: ProyeksiAktual[] = [
-  { departemen: 'Operasional', jenisBiaya: 'Pembelian bahan baku', kategori: 'COGS', proyeksi: 42000000, aktual: 63500000, catatan: 'Harga bahan naik dan pembelian tambahan akhir pekan.', minggu: 'Minggu 1' },
-  { departemen: 'Marketing', jenisBiaya: 'Kampanye digital', kategori: 'Iklan', proyeksi: 18000000, aktual: 28450750, catatan: 'Boost ads melebihi rencana launching menu.', minggu: 'Minggu 2' },
-  { departemen: 'HR & GA', jenisBiaya: 'Lembur & casual', kategori: 'Payroll', proyeksi: 16000000, aktual: 19250000, catatan: 'Tambahan shift event.', minggu: 'Minggu 2' },
-  { departemen: 'Maintenance', jenisBiaya: 'Perbaikan chiller', kategori: 'Perbaikan', proyeksi: 8500000, aktual: 22200000, catatan: 'Penggantian sparepart tidak terproyeksi.', minggu: 'Minggu 3' },
-  { departemen: 'Finance', jenisBiaya: 'Admin bank & pajak', kategori: 'Administrasi', proyeksi: 7366000, aktual: 6420000, catatan: 'Masih dalam batas budget.', minggu: 'Minggu 3' },
-  { departemen: 'IT', jenisBiaya: 'POS dan software', kategori: 'Langganan', proyeksi: 12500000, aktual: 11800000, catatan: 'Renewal sesuai kontrak.', minggu: 'Minggu 4' },
-  { departemen: 'Logistik', jenisBiaya: 'Pengiriman outlet', kategori: 'Distribusi', proyeksi: 22000000, aktual: 34752048, catatan: 'Tambahan rute dan urgent delivery.', minggu: 'Minggu 4' },
-  { departemen: 'Outlet', jenisBiaya: 'Petty cash outlet', kategori: 'Operasional Outlet', proyeksi: 20000000, aktual: 20250000, catatan: 'Sedikit di atas proyeksi.', minggu: 'Minggu 1' },
-  { departemen: 'Legal', jenisBiaya: 'Perizinan mendadak', kategori: 'Legal', proyeksi: 0, aktual: 0, catatan: 'Belum ada realisasi.', minggu: 'Minggu 4' },
+  { departemen: 'Operasional', jenisBiaya: 'Pembelian bahan baku', kategori: 'COGS', proyeksi: 42000000, aktual: 63500000, catatan: 'Harga bahan naik dan pembelian tambahan akhir pekan.', minggu: 'Minggu 1', tahun: 2026, bulan: 1 },
+  { departemen: 'Marketing', jenisBiaya: 'Kampanye digital', kategori: 'Iklan', proyeksi: 18000000, aktual: 28450750, catatan: 'Boost ads melebihi rencana launching menu.', minggu: 'Minggu 2', tahun: 2026, bulan: 2 },
+  { departemen: 'HR & GA', jenisBiaya: 'Lembur & casual', kategori: 'Payroll', proyeksi: 16000000, aktual: 19250000, catatan: 'Tambahan shift event.', minggu: 'Minggu 2', tahun: 2026, bulan: 2 },
+  { departemen: 'Maintenance', jenisBiaya: 'Perbaikan chiller', kategori: 'Perbaikan', proyeksi: 8500000, aktual: 22200000, catatan: 'Penggantian sparepart tidak terproyeksi.', minggu: 'Minggu 3', tahun: 2026, bulan: 3 },
+  { departemen: 'Finance', jenisBiaya: 'Admin bank & pajak', kategori: 'Administrasi', proyeksi: 7366000, aktual: 6420000, catatan: 'Masih dalam batas budget.', minggu: 'Minggu 3', tahun: 2026, bulan: 3 },
+  { departemen: 'IT', jenisBiaya: 'POS dan software', kategori: 'Langganan', proyeksi: 12500000, aktual: 11800000, catatan: 'Renewal sesuai kontrak.', minggu: 'Minggu 4', tahun: 2026, bulan: 4 },
+  { departemen: 'Logistik', jenisBiaya: 'Pengiriman outlet', kategori: 'Distribusi', proyeksi: 22000000, aktual: 34752048, catatan: 'Tambahan rute dan urgent delivery.', minggu: 'Minggu 4', tahun: 2026, bulan: 4 },
+  { departemen: 'Outlet', jenisBiaya: 'Petty cash outlet', kategori: 'Operasional Outlet', proyeksi: 20000000, aktual: 20250000, catatan: 'Sedikit di atas proyeksi.', minggu: 'Minggu 1', tahun: 2026, bulan: 1 },
+  { departemen: 'Legal', jenisBiaya: 'Perizinan mendadak', kategori: 'Legal', proyeksi: 0, aktual: 0, catatan: 'Belum ada realisasi.', minggu: 'Minggu 4', tahun: 2026, bulan: 4 },
 ];
 
 export const rekeningBank: RekeningBank[] = [

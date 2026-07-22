@@ -1,6 +1,6 @@
 export type StatusBudget = 'AMAN' | 'PERLU PERHATIAN' | 'OVER BUDGET' | 'TIDAK DIPROYEKSIKAN';
 export type ProyeksiAktual = { departemen: string; jenisBiaya: string; kategori: string; proyeksi: number; aktual: number; catatan: string; minggu: string };
-export type RekeningBank = { brand: 'FIN_MAKAN' | 'FIN_MINUM'; bank: string; nomor: string; saldoAwal: number; masuk: number; keluar: number; saldoMinimum: number; updatedAt: string };
+export type RekeningBank = { brand: string; perusahaan: string; bank: string; nomor: string; saldoAwal: number; masuk: number; keluar: number; saldoMinimum: number; updatedAt: string };
 export type MutasiBank = { tanggal: string; bank: string; nomorRekening: string; deskripsi: string; referensi: string; debit: number; kredit: number; saldo: number; departemen: string; kategori: string; masukProyeksi: boolean; catatan: string };
 
 export const proyeksiAktual: ProyeksiAktual[] = [
@@ -16,12 +16,12 @@ export const proyeksiAktual: ProyeksiAktual[] = [
 ];
 
 export const rekeningBank: RekeningBank[] = [
-  { brand: 'FIN_MAKAN', bank: 'OCBC', nomor: '731', saldoAwal: 71000000, masuk: 68500000, keluar: 48500000, saldoMinimum: 25000000, updatedAt: '2026-07-22T08:10:00Z' },
-  { brand: 'FIN_MAKAN', bank: 'BCA', nomor: '822', saldoAwal: 42000000, masuk: 52500000, keluar: 61750000, saldoMinimum: 20000000, updatedAt: '2026-07-22T08:15:00Z' },
-  { brand: 'FIN_MAKAN', bank: 'Mandiri', nomor: '305', saldoAwal: 31500000, masuk: 30000000, keluar: 28900000, saldoMinimum: 15000000, updatedAt: '2026-07-22T08:20:00Z' },
-  { brand: 'FIN_MINUM', bank: 'OCBC', nomor: '242', saldoAwal: 36500000, masuk: 44500000, keluar: 33200000, saldoMinimum: 18000000, updatedAt: '2026-07-22T08:25:00Z' },
-  { brand: 'FIN_MINUM', bank: 'BCA', nomor: '881', saldoAwal: 27000000, masuk: 40200000, keluar: 42500000, saldoMinimum: 17000000, updatedAt: '2026-07-22T08:30:00Z' },
-  { brand: 'FIN_MINUM', bank: 'Mandiri', nomor: '347', saldoAwal: 18500000, masuk: 29739414, keluar: 24922798, saldoMinimum: 12000000, updatedAt: '2026-07-22T08:35:00Z' },
+  { brand: 'FIN_MAKAN', perusahaan: 'PT Makan Sejahtera Utama', bank: 'OCBC', nomor: '731', saldoAwal: 71000000, masuk: 68500000, keluar: 48500000, saldoMinimum: 25000000, updatedAt: '2026-07-22T08:10:00Z' },
+  { brand: 'FIN_MAKAN', perusahaan: 'PT Makan Sejahtera Utama', bank: 'BCA', nomor: '822', saldoAwal: 42000000, masuk: 52500000, keluar: 61750000, saldoMinimum: 20000000, updatedAt: '2026-07-22T08:15:00Z' },
+  { brand: 'FIN_MAKAN', perusahaan: 'CV Dapur Makan Bersama', bank: 'Mandiri', nomor: '305', saldoAwal: 31500000, masuk: 30000000, keluar: 28900000, saldoMinimum: 15000000, updatedAt: '2026-07-22T08:20:00Z' },
+  { brand: 'FIN_MINUM', perusahaan: 'PT Minum Segar Sentosa', bank: 'OCBC', nomor: '242', saldoAwal: 36500000, masuk: 44500000, keluar: 33200000, saldoMinimum: 18000000, updatedAt: '2026-07-22T08:25:00Z' },
+  { brand: 'FIN_MINUM', perusahaan: 'PT Minum Segar Sentosa', bank: 'BCA', nomor: '881', saldoAwal: 27000000, masuk: 40200000, keluar: 42500000, saldoMinimum: 17000000, updatedAt: '2026-07-22T08:30:00Z' },
+  { brand: 'FIN_MINUM', perusahaan: 'CV Bar Minum Harian', bank: 'Mandiri', nomor: '347', saldoAwal: 18500000, masuk: 29739414, keluar: 24922798, saldoMinimum: 12000000, updatedAt: '2026-07-22T08:35:00Z' },
 ];
 
 export const mutasiBank: MutasiBank[] = [

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { mutasiBank, proyeksiAktual, rekeningBank, type ProyeksiAktual, type RekeningBank, type StatusBudget } from '../lib/cashflowData';
 import { persentaseRealisasi, saldoAkhir, selisihBudget, statusBudget, totalAktual, totalProyeksi, totalSaldoSeluruhRekening } from '../lib/cashflowCalculations';
 import { formatCurrency } from '../lib/format';
+import { downloadMutasiTemplate } from '../lib/templateDownloads';
 
 const menus = ['Dashboard', 'Proyeksi vs Aktual', 'Saldo', 'Mutasi Bank', 'Analisis Over Budget', 'Departemen', 'Data Master', 'Pengaturan'] as const;
 type Menu = typeof menus[number];
@@ -20,25 +21,6 @@ const applyProjectionFilters = (rows: ProyeksiAktual[], filters: DashboardFilter
 const applyRekeningFilters = (rows: RekeningBank[], filters: DashboardFilters) => rows.filter((row) => (filters.brand === 'Semua' || row.brand === filters.brand) && dateMatchesPeriod(row.updatedAt, filters));
 const menuLabel: Record<Language, Record<Menu, string>> = { id: Object.fromEntries(menus.map((m) => [m, m])) as Record<Menu, string>, en: { Dashboard: 'Dashboard', 'Proyeksi vs Aktual': 'Projection vs Actual', Saldo: 'Balances', 'Mutasi Bank': 'Bank Transactions', 'Analisis Over Budget': 'Over Budget Analysis', Departemen: 'Departments', 'Data Master': 'Master Data', Pengaturan: 'Settings' } };
 const t = (language: Language, id: string, en: string) => language === 'id' ? id : en;
-const downloadMutasiTemplate = (notify: (msg: string) => void, language: Language) => {
-  const headers = ['Tanggal', 'Bank', 'Nomor Rekening', 'Deskripsi Transaksi', 'Nomor Referensi', 'Debit', 'Kredit', 'Saldo', 'Departemen', 'Kategori', 'Masuk Proyeksi', 'Catatan'];
-  const rows = [
-    ['2026-07-01', 'OCBC', '731', 'Settlement penjualan harian', 'OC731-001', '0', '28500000', '99500000', 'Outlet', 'Cash In', 'Ya', 'Valid'],
-    ['2026-07-03', 'BCA', '822', 'Pembayaran supplier ayam', 'BCA822-014', '31500000', '0', '50250000', 'Operasional', 'COGS', 'Ya', 'Debit dan kredit tidak boleh terisi bersamaan'],
-    ['2026-07-08', 'Mandiri', '305', 'Service chiller outlet', 'MD305-008', '22200000', '0', '39300000', 'Maintenance', 'Perbaikan', 'Tidak', 'Tidak diproyeksikan'],
-  ];
-  const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'contoh-upload-mutasi-bank.csv';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-  notify(t(language, 'Contoh file upload mutasi bank berhasil diunduh.', 'Bank transaction upload template downloaded.'));
-};
 const getSystemTheme = () => window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 
 export function BalanceDashboard() {

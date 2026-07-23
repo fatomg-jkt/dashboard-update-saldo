@@ -1,77 +1,138 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useAuthUnlock, useDashboardData, useStorageStatus, useUpdateDashboardData } from '../hooks/useDashboardApi';
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useAuthUnlock, useDashboardData, useUpdateDashboardData } from '../hooks/useDashboardApi';
+import { byCategory, createId, formatCurrency, groupBrands, stamp, today, totalBalance, withSettings } from '../lib/format';
 import { sampleDashboardData } from '../lib/sampleData';
-import type { BalanceEntry, DashboardData, DeviceStatus } from '../types';
+import type { BalanceEntry, Category, DashboardData, DeviceStatus } from '../types';
 import { categories } from '../types';
 
-const rupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value);
-const dateFmt = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(value));
-const timeFmt = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
-const brandTone: Record<string, string> = { pink: 'from-pink-500 to-rose-500', fuchsia: 'from-fuchsia-500 to-purple-500', black: 'from-zinc-800 to-black', orange: 'from-orange-400 to-amber-500', purple: 'from-violet-500 to-purple-700', blue: 'from-blue-500 to-cyan-500', gray: 'from-slate-500 to-slate-700', 'dark-gray': 'from-zinc-600 to-stone-800', green: 'from-emerald-500 to-lime-500', red: 'from-red-500 to-orange-600', 'light-yellow': 'from-yellow-300 to-amber-400', 'dark-green': 'from-green-700 to-emerald-900' };
-
-type GroupedBrand = { name: string; color?: string; total: number; entries: BalanceEntry[]; categories: Record<string, number> };
-
-const getTotal = (entries: BalanceEntry[]) => entries.filter((e) => e.isActive).reduce((sum, entry) => sum + entry.balance, 0);
-const emptyEntry = (order: number): BalanceEntry => ({ id: `entry-${Date.now()}`, brandName: 'BRAND BARU', accountName: 'BCA 000', provider: 'BCA', category: 'Bank', balance: 0, displayOrder: order, isActive: true, updatedAt: new Date().toISOString() });
-
-function groupBrands(entries: BalanceEntry[]): GroupedBrand[] {
-  const map = new Map<string, GroupedBrand>();
-  entries.filter((entry) => entry.isActive).sort((a, b) => a.displayOrder - b.displayOrder).forEach((entry) => {
-    const current = map.get(entry.brandName) ?? { name: entry.brandName, color: entry.brandColor, total: 0, entries: [], categories: {} };
-    current.total += entry.balance;
-    current.entries.push(entry);
-    current.categories[entry.category] = (current.categories[entry.category] ?? 0) + entry.balance;
-    map.set(entry.brandName, current);
-  });
-  return [...map.values()].sort((a, b) => b.total - a.total);
-}
+const emptyEntry = (brandName: string, groupName?: string, entityName?: string, brandColor?: string): BalanceEntry => ({ id: createId('entry'), brandName, brandColor, groupName, entityName, accountName: 'Rekening Baru', provider: 'BCA', accountCode: '', category: 'Bank', balance: 0, notes: '', displayOrder: Date.now(), isActive: true, updatedAt: stamp() });
+const setEntries = (data: DashboardData, entries: BalanceEntry[]): DashboardData => withSettings({ ...data, balanceEntries: entries });
+const setDevices = (data: DashboardData, rows: DeviceStatus[]): DashboardData => withSettings({ ...data, deviceStatuses: rows });
 
 export function BalanceDashboard() {
-  const storageStatus = useStorageStatus();
-  const dashboardQuery = useDashboardData();
-  const updateDashboard = useUpdateDashboardData();
-  const unlock = useAuthUnlock();
-  const [data, setData] = useState<DashboardData>(sampleDashboardData);
-  const [selectedBrand, setSelectedBrand] = useState('Semua Brand');
-  const [category, setCategory] = useState('Semua Kategori');
-  const [search, setSearch] = useState('');
+  const dashboard = useDashboardData();
+  const updateData = useUpdateDashboardData();
+  const auth = useAuthUnlock();
+  const [tab, setTab] = useState<'overview' | 'brands' | 'devices'>('overview');
+  const [editMode, setEditMode] = useState(() => sessionStorage.getItem('finance-edit-mode') === 'true');
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [password, setPassword] = useState('');
-  const [editMode, setEditMode] = useState(() => sessionStorage.getItem('saldo-edit-mode') === 'true');
+  const [authError, setAuthError] = useState('');
   const [toast, setToast] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<'Semua' | Category>('Semua');
+  const [sort, setSort] = useState<'desc' | 'asc'>('desc');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickDraft, setQuickDraft] = useState<Record<string, { balance: string; notes: string }>>({});
+  const [quickError, setQuickError] = useState('');
 
-  useEffect(() => { if (dashboardQuery.data?.success) setData(dashboardQuery.data.data); }, [dashboardQuery.data]);
-  const notify = (message: string) => { setToast(message); setTimeout(() => setToast(''), 2400); };
-  const brands = useMemo(() => groupBrands(data.balanceEntries), [data.balanceEntries]);
-  const selectedEntries = useMemo(() => data.balanceEntries.filter((entry) => (selectedBrand === 'Semua Brand' || entry.brandName === selectedBrand) && (category === 'Semua Kategori' || entry.category === category) && `${entry.brandName} ${entry.accountName} ${entry.entityName ?? ''}`.toLowerCase().includes(search.toLowerCase())), [data.balanceEntries, selectedBrand, category, search]);
-  const total = getTotal(selectedEntries);
-  const topBrands = brands.slice(0, 5);
-  const categoryTotals = categories.map((cat) => ({ cat, total: getTotal(data.balanceEntries.filter((entry) => entry.category === cat)) })).filter((row) => row.total > 0);
-  const save = (next: DashboardData) => { setData(next); updateDashboard.mutate(next, { onSuccess: () => notify('Data berhasil disimpan ke dashboard.'), onError: (error) => notify(error instanceof Error ? error.message : 'Gagal menyimpan data.') }); };
-  const unlockEdit = () => unlock.mutate(password, { onSuccess: () => { sessionStorage.setItem('saldo-edit-mode', 'true'); setEditMode(true); setPassword(''); notify('Edit mode aktif.'); }, onError: () => notify('Password salah atau API auth tidak tersedia.') });
-  const updateEntry = (id: string, patch: Partial<BalanceEntry>) => save({ ...data, balanceEntries: data.balanceEntries.map((entry) => entry.id === id ? { ...entry, ...patch, updatedAt: new Date().toISOString() } : entry), dashboardSettings: { ...data.dashboardSettings, lastUpdatedAt: new Date().toISOString() } });
-  const updateDevice = (id: string, patch: Partial<DeviceStatus>) => save({ ...data, deviceStatuses: data.deviceStatuses.map((device) => device.id === id ? { ...device, ...patch, updatedAt: new Date().toISOString() } : device), dashboardSettings: { ...data.dashboardSettings, lastUpdatedAt: new Date().toISOString() } });
-  const addEntry = () => save({ ...data, balanceEntries: [...data.balanceEntries, emptyEntry(data.balanceEntries.length + 1)] });
+  const dashboardResponse = dashboard.data;
+  const data = dashboardResponse?.success ? dashboardResponse.data : undefined;
+  const metrics = useMemo(() => {
+    const entries = data?.balanceEntries ?? [];
+    const groups = groupBrands(entries);
+    return { total: totalBalance(entries), groups, brandCount: groups.length, entryCount: entries.filter((e) => e.isActive).length, categoryTotals: byCategory(entries), topBrands: [...groups].sort((a, b) => b.subtotal - a.subtotal).slice(0, 5) };
+  }, [data]);
+  const filteredGroups = useMemo(() => metrics.groups.map((group) => ({ ...group, entries: group.entries.filter((entry) => `${entry.brandName} ${entry.entityName ?? ''} ${entry.accountName} ${entry.provider} ${entry.accountCode ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (category === 'Semua' || entry.category === category)) })).filter((group) => group.entries.length), [metrics.groups, search, category]);
 
-  if (storageStatus.data && !storageStatus.data.configured) return <SetupScreen error={storageStatus.data.error} />;
+  const save = (next: DashboardData, message: string) => updateData.mutate(next, { onSuccess: (response) => { if (response.success) { setToast(message); setTimeout(() => setToast(''), 2500); } } });
+  const updateEntry = (id: string, patch: Partial<BalanceEntry>) => data && save(setEntries(data, data.balanceEntries.map((entry) => entry.id === id ? { ...entry, ...patch, updatedAt: stamp() } : entry)), 'Perubahan saldo tersimpan ke Vercel Blob.');
+  const deleteEntry = (id: string) => data && confirm('Hapus rekening ini?') && save(setEntries(data, data.balanceEntries.filter((entry) => entry.id !== id)), 'Rekening berhasil dihapus.');
+  const addEntry = (brandName: string, groupName?: string, entityName?: string, brandColor?: string) => data && save(setEntries(data, [...data.balanceEntries, emptyEntry(brandName, groupName, entityName, brandColor)]), 'Rekening baru ditambahkan.');
+  const updateDevice = (id: string, patch: Partial<DeviceStatus>) => data && save(setDevices(data, data.deviceStatuses.map((row) => row.id === id ? { ...row, ...patch, updatedAt: stamp() } : row)), 'Status device tersimpan.');
+  const addDevice = () => data && save(setDevices(data, [...data.deviceStatuses, { id: createId('device'), area: 'Area Baru', status: 'OK', number: '', device: '', notes: '', displayOrder: Date.now(), updatedAt: stamp() }]), 'Device ditambahkan.');
+  const resetDefaultStructure = () => data && confirm('Ini akan mengganti struktur brand/rekening dengan template default. Lanjutkan?') && save(withSettings({ ...data, balanceEntries: sampleDashboardData.balanceEntries.map((entry) => ({ ...entry, updatedAt: stamp() })) }), 'Struktur brand default berhasil disimpan.');
+  const deleteDevice = (id: string) => data && confirm('Hapus device ini?') && save(setDevices(data, data.deviceStatuses.filter((row) => row.id !== id)), 'Device dihapus.');
+  const unlock = async () => { const result = await auth.mutateAsync(password); if (result.ok) { sessionStorage.setItem('finance-edit-mode', 'true'); setEditMode(true); setPasswordOpen(false); setAuthError(''); } else setAuthError('Password belum sesuai. Silakan cek kembali.'); };
+  const openQuickUpdate = () => { if (!data) return; setQuickDraft(Object.fromEntries(data.balanceEntries.map((entry) => [entry.id, { balance: String(entry.balance), notes: entry.notes ?? '' }]))); setQuickError(''); setQuickOpen(true); };
+  const saveQuickUpdate = async () => {
+    if (!data) return;
+    setQuickError('');
+    const next = withSettings({ ...data, balanceEntries: data.balanceEntries.map((entry) => { const draft = quickDraft[entry.id]; return draft ? { ...entry, balance: Number(draft.balance), notes: draft.notes, updatedAt: stamp() } : entry; }), dashboardSettings: { ...data.dashboardSettings, updateDate: today(), lastUpdatedAt: stamp() } });
+    try {
+      const response = await updateData.mutateAsync(next);
+      if (!response.success) { setQuickError(response.error); return; }
+      setToast('Quick update selesai.');
+      setTimeout(() => setToast(''), 2500);
+      setQuickOpen(false);
+    } catch (error) {
+      setQuickError(error instanceof Error ? error.message : 'Quick update gagal disimpan.');
+    }
+  };
 
-  return <main className="min-h-screen bg-[#f4f7fb] text-slate-900">
-    {toast && <div className="fixed right-5 top-5 z-50 rounded-2xl bg-slate-950 px-5 py-3 font-semibold text-white shadow-2xl">{toast}</div>}
-    <section className="mx-auto max-w-[1500px] p-4 md:p-8">
-      <header className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-white shadow-2xl md:p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-300">Finance Live Dashboard</p><h1 className="mt-3 text-4xl font-black md:text-6xl">{data.dashboardSettings.dashboardTitle}</h1><p className="mt-3 text-slate-300">Update saldo semua brand per {dateFmt(data.dashboardSettings.updateDate)} · terakhir sinkron {timeFmt(data.dashboardSettings.lastUpdatedAt)}</p></div><div className="rounded-3xl bg-white/10 p-5 backdrop-blur"><p className="text-sm text-slate-300">Total All Rekening</p><p className="mt-2 text-3xl font-black text-cyan-200">{rupiah(total)}</p></div></div>
-      </header>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_380px]"><section className="space-y-5"><Filters brands={brands.map((b) => b.name)} selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} category={category} setCategory={setCategory} search={search} setSearch={setSearch} />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Stat label="Rekening Aktif" value={String(selectedEntries.filter((e)=>e.isActive).length)} /><Stat label="Brand" value={String(brands.length)} /><Stat label="Device OK" value={`${data.deviceStatuses.filter((d)=>d.status.toLowerCase().includes('ok')).length}/${data.deviceStatuses.length}`} /><Stat label="Kategori" value={String(categoryTotals.length)} /></div>
-        <div className="grid gap-4 xl:grid-cols-2">{(selectedBrand === 'Semua Brand' ? brands : brands.filter((b)=>b.name===selectedBrand)).map((brand) => <BrandCard key={brand.name} brand={brand} editMode={editMode} onUpdate={updateEntry} />)}</div>
-      </section><aside className="space-y-5"><EditPanel editMode={editMode} password={password} setPassword={setPassword} unlockEdit={unlockEdit} addEntry={addEntry} saving={updateDashboard.isPending || unlock.isPending} /><SummaryPanel topBrands={topBrands} categoryTotals={categoryTotals} total={getTotal(data.balanceEntries)} /><DevicePanel devices={data.deviceStatuses} editMode={editMode} onUpdate={updateDevice} /></aside></div>
-    </section>
-  </main>;
+  if (dashboard.isLoading) return <State title="Mengambil data saldo" message="Jika file Blob belum ada, sample data akan otomatis digunakan. Maksimal tunggu 10 detik." />;
+  if (dashboard.isError) return <State title="Dashboard gagal dimuat" message={dashboard.error instanceof Error ? dashboard.error.message : 'API dashboard-data belum merespons normal.'} retry={() => dashboard.refetch()} />;
+  if (dashboardResponse && !dashboardResponse.success) return <State title="Dashboard gagal dimuat" message={dashboardResponse.error ?? 'API mengembalikan status gagal.'} retry={() => dashboard.refetch()} />;
+  if (!data) return <State title="Dashboard gagal dimuat" message="API dashboard-data tidak mengirim data dashboard." retry={() => dashboard.refetch()} />;
+
+  return <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900 lg:px-8"><div className="mx-auto max-w-7xl space-y-8">
+    {toast && <div className="fixed right-5 top-5 z-50 rounded-2xl bg-emerald-600 px-5 py-3 text-white shadow-xl">{toast}</div>}
+    <header className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-8 text-white shadow-2xl"><div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-sm uppercase tracking-[0.3em] text-emerald-300">Executive Finance Dashboard</p><h1 className="mt-3 text-4xl font-semibold">{data.dashboardSettings.dashboardTitle}</h1><p className="mt-3 text-slate-300">Update {data.dashboardSettings.updateDate} · Last saved {new Date(data.dashboardSettings.lastUpdatedAt).toLocaleString('id-ID')}</p></div><div className="flex flex-wrap gap-3">{editMode && <button className="rounded-full bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950">Edit Mode Active</button>}<button onClick={() => editMode ? (sessionStorage.removeItem('finance-edit-mode'), setEditMode(false)) : setPasswordOpen(true)} className="rounded-full bg-white/10 px-5 py-2 font-semibold ring-1 ring-white/20 hover:bg-white/20">{editMode ? 'Lock Edit Mode' : 'Unlock Edit Mode'}</button></div></div><div className="mt-10"><p className="text-slate-300">Total All Rekening</p><p className="mt-2 text-5xl font-bold lg:text-7xl">{formatCurrency(metrics.total)}</p></div></header>
+    <nav className="flex gap-3 rounded-3xl bg-white p-2 shadow-sm">{[['overview','Overview'],['brands','Brand Details'],['devices','Device Status']].map(([key,label]) => <button key={key} onClick={() => setTab(key as typeof tab)} className={`flex-1 rounded-2xl px-4 py-3 font-semibold ${tab === key ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>{label}</button>)}</nav>
+    {editMode && <div className="flex flex-wrap gap-3"><button onClick={openQuickUpdate} className="rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white shadow-lg">Quick Update Saldo Hari Ini</button><button onClick={resetDefaultStructure} className="rounded-2xl bg-rose-600 px-5 py-3 font-bold text-white shadow-lg hover:bg-rose-700">Reset Struktur Brand Default</button></div>}
+    {tab === 'overview' && <section className="space-y-6"><div className="grid gap-4 md:grid-cols-4">{[['Total All Rekening', metrics.total], ['Jumlah Brand/Entity', metrics.brandCount], ['Jumlah Rekening', metrics.entryCount], ['Tanggal Update', data.dashboardSettings.updateDate]].map(([label,value]) => <div key={label} className="rounded-3xl bg-white p-6 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-3 text-2xl font-bold">{typeof value === 'number' && label === 'Total All Rekening' ? formatCurrency(value) : value}</p></div>)}</div><section className="rounded-[2rem] bg-white p-6 shadow-sm"><div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="text-sm font-bold uppercase tracking-[0.25em] text-slate-400">Overview</p><h2 className="mt-1 text-2xl font-black text-slate-950">Total Saldo per Brand</h2></div><p className="text-sm text-slate-500">Semua brand tetap tampil meskipun saldo masih Rp 0.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{metrics.groups.map((group) => <BrandTotalCard key={group.brandName} group={group} />)}</div></section><div className="grid gap-6 lg:grid-cols-3"><Panel title="Top 5 Brand Saldo Terbesar">{metrics.topBrands.map((g) => <Line key={g.brandName} left={g.brandName} right={formatCurrency(g.subtotal)} />)}</Panel><Panel title="Breakdown Kategori">{categories.map((cat) => <Line key={cat} left={cat} right={formatCurrency(metrics.categoryTotals[cat] || 0)} />)}</Panel><Panel title="Device Status Summary"><Line left="Total Device" right={`${data.deviceStatuses.length}`} /><Line left="Perlu Cek" right={`${data.deviceStatuses.filter((d) => d.status.toLowerCase() !== 'ok').length}`} /></Panel></div></section>}
+    {tab === 'brands' && <section className="space-y-6"><div className="grid gap-3 rounded-3xl bg-white p-4 shadow-sm md:grid-cols-3"><input className="input" placeholder="Search brand/account/provider/code" value={search} onChange={(e) => setSearch(e.target.value)} /><select className="input" value={category} onChange={(e) => setCategory(e.target.value as 'Semua' | Category)}><option>Semua</option>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select><select className="input" value={sort} onChange={(e) => setSort(e.target.value as 'asc' | 'desc')}><option value="desc">Urutan struktur</option><option value="asc">Urutan struktur</option></select></div>{filteredGroups.map((group) => <BrandCard key={group.brandName} group={group} editMode={editMode} updateEntry={updateEntry} deleteEntry={deleteEntry} addEntry={addEntry} />)}</section>}
+    {tab === 'devices' && <section className="rounded-3xl bg-white p-6 shadow-sm"><div className="mb-4 flex justify-between"><h2 className="text-2xl font-bold">Device Status</h2>{editMode && <button onClick={addDevice} className="rounded-xl bg-slate-900 px-4 py-2 text-white">Tambah Row</button>}</div><div className="overflow-x-auto"><table className="w-full min-w-[760px]"><thead><tr className="text-left text-slate-500"><th>Area</th><th>Status</th><th>Number</th><th>Device</th><th>Notes</th><th></th></tr></thead><tbody>{data.deviceStatuses.map((row) => <tr key={row.id} className="border-t"><Cell edit={editMode} value={row.area} onChange={(v) => updateDevice(row.id, { area: v })} /><Cell edit={editMode} value={row.status} onChange={(v) => updateDevice(row.id, { status: v })} /><Cell edit={editMode} value={row.number ?? ''} onChange={(v) => updateDevice(row.id, { number: v })} /><Cell edit={editMode} value={row.device ?? ''} onChange={(v) => updateDevice(row.id, { device: v })} /><Cell edit={editMode} value={row.notes ?? ''} onChange={(v) => updateDevice(row.id, { notes: v })} /><td>{editMode && <button className="text-rose-600" onClick={() => deleteDevice(row.id)}>Hapus</button>}</td></tr>)}</tbody></table></div></section>}
+    {passwordOpen && <Modal title="Unlock Edit Mode" onClose={() => setPasswordOpen(false)}><input className="input w-full" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password edit mode" /><button className="mt-4 w-full rounded-2xl bg-slate-900 py-3 font-bold text-white" onClick={unlock}>Unlock</button>{authError && <p className="mt-3 text-sm text-rose-600">{authError}</p>}</Modal>}
+    {quickOpen && <Modal title="Quick Update Saldo Hari Ini" onClose={() => setQuickOpen(false)}><div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[900px] text-sm"><thead><tr className="text-left"><th>Brand</th><th>Account</th><th>Provider</th><th>Code</th><th>Current Balance</th><th>New Balance</th><th>Notes</th></tr></thead><tbody>{data.balanceEntries.map((entry) => <tr className="border-t" key={entry.id}><td>{entry.brandName}</td><td>{entry.accountName}</td><td>{entry.provider}</td><td>{entry.accountCode}</td><td>{formatCurrency(entry.balance)}</td><td><input className="input" type="number" value={quickDraft[entry.id]?.balance ?? String(entry.balance)} onChange={(e) => setQuickDraft((draft) => ({ ...draft, [entry.id]: { balance: e.target.value, notes: draft[entry.id]?.notes ?? entry.notes ?? '' } }))} /></td><td><input className="input" value={quickDraft[entry.id]?.notes ?? entry.notes ?? ''} onChange={(e) => setQuickDraft((draft) => ({ ...draft, [entry.id]: { balance: draft[entry.id]?.balance ?? String(entry.balance), notes: e.target.value } }))} /></td></tr>)}</tbody></table></div>{quickError && <p className="mt-3 text-sm font-semibold text-rose-600">{quickError}</p>}<button className="mt-4 rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-60" disabled={updateData.isPending} onClick={saveQuickUpdate}>{updateData.isPending ? 'Saving...' : 'Save'}</button></Modal>}
+  </div></main>;
 }
-function SetupScreen({ error }: { error?: string }) { return <div className="grid min-h-screen place-items-center bg-slate-100 p-6"><div className="max-w-xl rounded-[2rem] bg-white p-8 shadow-xl"><h1 className="text-3xl font-black">Vercel Blob belum dikonfigurasi</h1><p className="mt-3 text-slate-600">Tambahkan BLOB_READ_WRITE_TOKEN dan ADMIN_PASSWORD di Vercel Environment Variables, lalu redeploy.</p>{error && <pre className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</pre>}</div></div> }
-function Filters(props: { brands: string[]; selectedBrand: string; setSelectedBrand: (v:string)=>void; category: string; setCategory:(v:string)=>void; search:string; setSearch:(v:string)=>void }) { return <div className="grid gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-3"><select className="input" value={props.selectedBrand} onChange={(e)=>props.setSelectedBrand(e.target.value)}><option>Semua Brand</option>{props.brands.map((brand)=><option key={brand}>{brand}</option>)}</select><select className="input" value={props.category} onChange={(e)=>props.setCategory(e.target.value)}><option>Semua Kategori</option>{categories.map((cat)=><option key={cat}>{cat}</option>)}</select><input className="input" placeholder="Cari rekening, entity, brand..." value={props.search} onChange={(e)=>props.setSearch(e.target.value)} /></div> }
-function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="text-sm font-semibold text-slate-500">{label}</p><p className="mt-2 text-3xl font-black">{value}</p></div> }
-function BrandCard({ brand, editMode, onUpdate }: { brand: GroupedBrand; editMode: boolean; onUpdate: (id:string, patch:Partial<BalanceEntry>)=>void }) { return <article className="overflow-hidden rounded-[1.75rem] bg-white shadow-sm ring-1 ring-slate-200"><div className={`bg-gradient-to-r ${brandTone[brand.color ?? 'blue'] ?? brandTone.blue} p-5 text-white`}><p className="text-sm uppercase tracking-[0.25em] opacity-80">Brand</p><div className="flex items-end justify-between gap-4"><h2 className="text-3xl font-black">{brand.name}</h2><b>{rupiah(brand.total)}</b></div></div><div className="divide-y divide-slate-100">{brand.entries.map((entry)=><div key={entry.id} className="grid gap-3 p-4 md:grid-cols-[1fr_auto]"><div><p className="font-bold">{entry.accountName}</p><p className="text-sm text-slate-500">{entry.entityName ?? entry.groupName ?? entry.category} · {entry.provider}</p></div>{editMode ? <input className="input w-44 text-right" type="number" value={entry.balance} onChange={(e)=>onUpdate(entry.id,{ balance: Number(e.target.value) })} /> : <p className="font-black">{rupiah(entry.balance)}</p>}</div>)}</div></article> }
-function EditPanel({ editMode, password, setPassword, unlockEdit, addEntry, saving }: { editMode:boolean; password:string; setPassword:(v:string)=>void; unlockEdit:()=>void; addEntry:()=>void; saving:boolean }) { return <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200"><h3 className="text-xl font-black">Mode Management</h3>{editMode ? <><p className="mt-2 text-sm text-emerald-700">Edit mode aktif untuk sesi browser ini.</p><button className="btn mt-4 w-full" onClick={addEntry}>Tambah Rekening</button></> : <div className="mt-4 flex gap-2"><input className="input min-w-0 flex-1" type="password" placeholder="Password admin" value={password} onChange={(e)=>setPassword(e.target.value)} /><button className="btn" disabled={saving} onClick={unlockEdit}>Unlock</button></div>}</div> }
-function SummaryPanel({ topBrands, categoryTotals, total }: { topBrands: GroupedBrand[]; categoryTotals: {cat:string; total:number}[]; total:number }) { return <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200"><h3 className="text-xl font-black">Executive Summary</h3><div className="mt-4 space-y-3">{topBrands.map((brand)=><Bar key={brand.name} label={brand.name} value={brand.total} total={total} />)}</div><h4 className="mt-6 font-bold">Breakdown Kategori</h4><div className="mt-3 space-y-2">{categoryTotals.map((row)=><Bar key={row.cat} label={row.cat} value={row.total} total={total} />)}</div></div> }
-function Bar({ label, value, total }: { label:string; value:number; total:number }) { const pct = total ? Math.round((value / total) * 100) : 0; return <div><div className="mb-1 flex justify-between text-sm"><span>{label}</span><b>{rupiah(value)}</b></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-blue-600" style={{ width: `${Math.max(4, pct)}%` }} /></div></div> }
-function DevicePanel({ devices, editMode, onUpdate }: { devices: DeviceStatus[]; editMode:boolean; onUpdate:(id:string, patch:Partial<DeviceStatus>)=>void }) { return <div className="rounded-[1.5rem] bg-white p-5 shadow-sm ring-1 ring-slate-200"><h3 className="text-xl font-black">Device Status</h3><div className="mt-4 space-y-3">{devices.map((device)=><div key={device.id} className="rounded-2xl bg-slate-50 p-3"><div className="flex items-center justify-between"><b>{device.area}</b><span className={`rounded-full px-3 py-1 text-xs font-bold ${device.status.toLowerCase().includes('ok') ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{device.status}</span></div><p className="mt-1 text-sm text-slate-500">{device.device} · {device.number}</p>{editMode && <input className="input mt-3 w-full" value={device.notes ?? ''} onChange={(e)=>onUpdate(device.id,{ notes:e.target.value })} />}</div>)}</div></div> }
+function State({ title, message, retry }: { title: string; message: string; retry?: () => void }) { return <main className="grid min-h-screen place-items-center bg-slate-100 p-6"><div className="max-w-xl rounded-3xl bg-white p-8 text-center shadow-sm"><h1 className="text-2xl font-bold">{title}</h1><p className="mt-3 text-slate-600">{message}</p>{retry && <button onClick={retry} className="mt-5 rounded-2xl bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-700">Retry</button>}</div></main>; }
+
+function BrandTotalCard({ group }: { group: ReturnType<typeof groupBrands>[number] }) {
+  return <article className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm"><div className={`bg-gradient-to-r ${colorClasses[group.brandColor || 'gray'] ?? colorClasses.gray} p-5`}><p className="text-xs font-bold uppercase tracking-[0.24em] opacity-80">Brand</p><h3 className="mt-2 min-h-16 text-2xl font-black leading-tight">{group.brandName}</h3></div><div className="p-5"><p className="text-sm font-semibold text-slate-500">Total saldo brand</p><p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{formatCurrency(group.subtotal)}</p><div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">{group.entries.length} rekening / account</div></div></article>;
+}
+function Panel({ title, children }: { title: string; children: ReactNode }) { return <div className="rounded-3xl bg-white p-6 shadow-sm"><h2 className="mb-4 text-xl font-bold">{title}</h2><div className="space-y-3">{children}</div></div>; }
+function Line({ left, right }: { left: string; right: string }) { return <div className="flex justify-between gap-4 border-b border-slate-100 pb-3"><span className="text-slate-600">{left}</span><strong>{right}</strong></div>; }
+function Cell({ edit, value, onChange }: { edit: boolean; value: string; onChange: (value: string) => void }) { return <td className="py-3 pr-3">{edit ? <input className="input" value={value} onChange={(e) => onChange(e.target.value)} /> : value}</td>; }
+function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/50 p-4"><div className="w-full max-w-6xl rounded-3xl bg-white p-6 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-bold">{title}</h2><button onClick={onClose} className="rounded-full bg-slate-100 px-3 py-1">Close</button></div>{children}</div></div>; }
+
+type NestedEntity = { name?: string; entries: BalanceEntry[] };
+type NestedGroup = { name?: string; entities: NestedEntity[]; entries: BalanceEntry[] };
+
+const colorClasses: Record<string, string> = {
+  pink: 'from-pink-500 to-rose-400 text-white',
+  fuchsia: 'from-fuchsia-600 to-pink-500 text-white',
+  black: 'from-slate-950 to-zinc-800 text-white',
+  orange: 'from-orange-500 to-amber-400 text-white',
+  purple: 'from-purple-700 to-violet-500 text-white',
+  blue: 'from-blue-700 to-sky-500 text-white',
+  gray: 'from-slate-500 to-slate-400 text-white',
+  'dark-gray': 'from-zinc-800 to-slate-700 text-white',
+  green: 'from-emerald-600 to-green-500 text-white',
+  red: 'from-red-700 to-rose-500 text-white',
+  'light-yellow': 'from-yellow-200 to-amber-100 text-slate-900',
+  'dark-green': 'from-green-900 to-emerald-700 text-white',
+};
+
+function nestEntries(entries: BalanceEntry[]): NestedGroup[] {
+  const groups = new Map<string, NestedGroup>();
+  entries.forEach((entry) => {
+    const groupKey = entry.groupName || '__direct__';
+    const group = groups.get(groupKey) || { name: entry.groupName, entities: [], entries: [] };
+    if (entry.entityName) {
+      let entity = group.entities.find((item) => item.name === entry.entityName);
+      if (!entity) {
+        entity = { name: entry.entityName, entries: [] };
+        group.entities.push(entity);
+      }
+      entity.entries.push(entry);
+    } else {
+      group.entries.push(entry);
+    }
+    groups.set(groupKey, group);
+  });
+  return [...groups.values()];
+}
+
+function BrandCard({ group, editMode, updateEntry, deleteEntry, addEntry }: { group: ReturnType<typeof groupBrands>[number]; editMode: boolean; updateEntry: (id: string, patch: Partial<BalanceEntry>) => void; deleteEntry: (id: string) => void; addEntry: (brandName: string, groupName?: string, entityName?: string, brandColor?: string) => void }) {
+  const nested = nestEntries(group.entries);
+  return <details className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm" open><summary className={`cursor-pointer list-none bg-gradient-to-r ${colorClasses[group.brandColor || 'gray'] ?? colorClasses.gray} p-6`}><div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.28em] opacity-80">Brand</p><h2 className="mt-2 text-3xl font-black tracking-tight">{group.brandName}</h2><p className="mt-2 text-sm opacity-85">{group.entries.length} rekening / akun</p></div><div className="rounded-2xl bg-white/18 px-5 py-3 text-right backdrop-blur"><p className="text-xs font-semibold uppercase opacity-80">Subtotal</p><p className="text-2xl font-black">{formatCurrency(group.subtotal)}</p></div></div></summary><div className="space-y-5 bg-slate-50 p-5 md:p-6">{nested.map((item, index) => <div key={`${item.name ?? 'direct'}-${index}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">{item.name && <h3 className="mb-4 inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-bold uppercase tracking-wide text-white"><span className="mr-2 text-slate-400">Group</span>{item.name}</h3>}<div className="space-y-4">{item.entities.map((entity) => <EntityBlock key={entity.name} entity={entity} editMode={editMode} updateEntry={updateEntry} deleteEntry={deleteEntry} />)}{item.entries.length > 0 && <EntityBlock entity={{ entries: item.entries }} editMode={editMode} updateEntry={updateEntry} deleteEntry={deleteEntry} />}</div>{editMode && <button onClick={() => addEntry(group.brandName, item.name, item.entities[0]?.name, group.brandColor)} className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">Tambah Rekening</button>}</div>)}</div></details>;
+}
+
+function EntityBlock({ entity, editMode, updateEntry, deleteEntry }: { entity: NestedEntity; editMode: boolean; updateEntry: (id: string, patch: Partial<BalanceEntry>) => void; deleteEntry: (id: string) => void }) {
+  return <div className="rounded-2xl border border-slate-100 bg-white p-4">{entity.name && <h4 className="mb-3 text-lg font-extrabold text-slate-900"><span className="mr-2 text-xs uppercase tracking-wide text-slate-400">Entity</span>{entity.name}</h4>}<div className="grid gap-3">{entity.entries.map((entry) => <div key={entry.id} className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm md:grid-cols-[1.5fr_1fr_0.8fr_1fr_1.2fr_auto] md:items-center"><Field edit={editMode} value={entry.accountName} onChange={(v) => updateEntry(entry.id, { accountName: v })} /><Field edit={editMode} value={entry.provider} onChange={(v) => updateEntry(entry.id, { provider: v })} /><Field edit={editMode} value={entry.accountCode ?? ''} onChange={(v) => updateEntry(entry.id, { accountCode: v })} /><div>{editMode ? <select className="input" value={entry.category} onChange={(e) => updateEntry(entry.id, { category: e.target.value as Category })}>{categories.map((cat) => <option key={cat}>{cat}</option>)}</select> : <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-600 ring-1 ring-slate-200">{entry.category}</span>}</div><div>{editMode ? <input className="input" type="number" value={entry.balance} onChange={(e) => updateEntry(entry.id, { balance: Number(e.target.value) })} /> : <strong>{formatCurrency(entry.balance)}</strong>}</div>{editMode && <button className="text-rose-600" onClick={() => deleteEntry(entry.id)}>Hapus</button>}</div>)}</div></div>;
+}
+
+function Field({ edit, value, onChange }: { edit: boolean; value: string; onChange: (value: string) => void }) { return <div className="font-semibold text-slate-800">{edit ? <input className="input" value={value} onChange={(e) => onChange(e.target.value)} /> : value}</div>; }

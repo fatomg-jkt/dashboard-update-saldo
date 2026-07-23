@@ -14,7 +14,7 @@
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "typescript": "5.9.3",
+    "typescript": "latest",
     "vite": "latest",
     "@vercel/blob": "latest"
   },
